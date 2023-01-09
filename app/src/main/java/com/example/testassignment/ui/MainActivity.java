@@ -12,11 +12,15 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.databinding.DataBindingUtil;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 import com.example.testassignment.R;
+import com.example.testassignment.databinding.ActivityMainBinding;
 import com.example.testassignment.ui.base.BaseActivity;
 import com.example.testassignment.ui.home.model.RateModel;
-import com.example.testassignment.ui.home.presenter.HomePresenter;
-import com.example.testassignment.ui.home.view.IHomeView;
+
+import com.example.testassignment.ui.home.view_model.HomeViewModel;
 
 import org.json.JSONObject;
 
@@ -27,46 +31,66 @@ import java.util.Map;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 
-public class MainActivity extends BaseActivity implements IHomeView {
-
-    @BindView( R.id.edit_txt_usd)
-    EditText editTextUsd;
-
-    @BindView( R.id.txt_other)
-    TextView textOther;
-
-    @BindView( R.id.currency_spinner)
-    Spinner currencySpinner;
-
-    HomePresenter presenter;
+public class MainActivity extends BaseActivity {
 
     Map<String, Double> rates;
     String selectedCurrency;
     List<String> currencyList;
     double amount, currencyRate;
 
+    HomeViewModel homeViewModel;
+    ActivityMainBinding binding;
+
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        ButterKnife.bind(this);
+        homeViewModel =  new ViewModelProvider(this).get(HomeViewModel.class);
+        binding = DataBindingUtil.setContentView(this, R.layout.activity_main);
 
-        presenter= new HomePresenter(this);
+        binding.setLifecycleOwner(this);
+
+        binding.setHomeViewModel(homeViewModel);
+//        setContentView(R.layout.activity_main);
+//        ButterKnife.bind(this);
+
         showLoader();
-        presenter.getRateList();
+//        presenter.getRateList();
+
+
+        homeViewModel.getRates().observe(this, rateModel -> {
+            if(rateModel != null){
+                hideLoader();
+                rates = rateModel.rates;
+
+                currencyList = new ArrayList<>(rates.keySet());
+
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, currencyList);
+                binding.currencySpinner.setAdapter(adapter);
+            }else{
+                Toast.makeText(context, "error", Toast.LENGTH_SHORT).show();
+            }
+
+        });
+
+//        homeViewModel.getTextUsd().observe(this, textUsd -> {
+//
+//            homeViewModel.textOthers.setValue(textUsd);
+//
+//        });
 
 
 
-        currencySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+        binding.currencySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
                 // your code here
                 selectedCurrency = currencyList.get(position);
                 currencyRate = rates.get(selectedCurrency);
                 double totalAMount = amount*currencyRate;
-                textOther.setText(String.valueOf(totalAMount));
+                homeViewModel.textOthers.setValue(String.valueOf(totalAMount));
             }
 
             @Override
@@ -76,7 +100,7 @@ public class MainActivity extends BaseActivity implements IHomeView {
 
         });
 
-        editTextUsd.addTextChangedListener(new TextWatcher() {
+         binding.editTxtUsd.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
 
@@ -87,7 +111,7 @@ public class MainActivity extends BaseActivity implements IHomeView {
                 if(charSequence.length()>0){
                     amount = Double.parseDouble(charSequence.toString());
                     double totalAMount = amount*currencyRate;
-                    textOther.setText(String.valueOf(totalAMount));
+                    homeViewModel.textOthers.setValue(String.valueOf(totalAMount));
                 }
 
 
@@ -100,28 +124,6 @@ public class MainActivity extends BaseActivity implements IHomeView {
         });
 
 
-    }
-
-
-    @Override
-    public void onResultRates(String message ,  RateModel rateModel) {
-
-        hideLoader();
-
-
-        if (message.equalsIgnoreCase("success")) {
-
-            rates = rateModel.rates;
-
-            currencyList = new ArrayList<>(rates.keySet());
-
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, currencyList);
-            currencySpinner.setAdapter(adapter);
-
-
-        } else {
-            Toast.makeText(context, "Something went wrong", Toast.LENGTH_SHORT).show();
-        }
     }
 
 }
